@@ -10,19 +10,35 @@ type Estado =
   | { fase: "pronto"; projeto: Projeto; hipoteses: Hipotese[] }
   | { fase: "erro"; mensagem: string };
 
+/**
+ * Converte o parâmetro de rota em identificador numérico.
+ *
+ * Roda durante o render, não dentro do efeito: id inválido é uma condição
+ * derivada da própria URL, não um estado a sincronizar com sistema externo.
+ */
+function lerIdDaRota(valor: string | string[] | undefined): number | null {
+  if (typeof valor !== "string") return null;
+  const numero = Number(valor);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
+}
+
+function Aviso({ titulo, detalhe }: { titulo: string; detalhe: string }) {
+  return (
+    <div style={{ border: "1px solid #E7C9A0", background: "#F6EEE1", borderRadius: 6, padding: 16 }}>
+      <strong>{titulo}</strong>
+      <p style={{ margin: "6px 0 0", fontSize: 14, color: "#8A5A1E" }}>{detalhe}</p>
+    </div>
+  );
+}
+
 /** Detalhe de um projeto e suas hipóteses de valor. */
 export default function ProjectDetailPage() {
   const router = useRouter();
-  const { id } = router.query;
+  const projetoId = lerIdDaRota(router.query.id);
   const [estado, setEstado] = useState<Estado>({ fase: "carregando" });
 
   useEffect(() => {
-    if (typeof id !== "string") return;
-    const projetoId = Number(id);
-    if (Number.isNaN(projetoId)) {
-      setEstado({ fase: "erro", mensagem: `Identificador inválido: ${id}` });
-      return;
-    }
+    if (projetoId === null) return;
 
     let ativo = true;
 
@@ -41,19 +57,32 @@ export default function ProjectDetailPage() {
     return () => {
       ativo = false;
     };
-  }, [id]);
+  }, [projetoId]);
+
+  // Enquanto o router não hidratou, `id` é undefined — não é erro, é espera.
+  if (projetoId === null && router.isReady) {
+    return (
+      <AppLayout titulo="Projeto">
+        <Aviso
+          titulo="Endereço inválido."
+          detalhe={`"${String(router.query.id)}" não é um identificador de projeto válido.`}
+        />
+      </AppLayout>
+    );
+  }
 
   if (estado.fase === "carregando") {
-    return <AppLayout titulo="Projeto"><p style={{ color: "#666" }}>Carregando…</p></AppLayout>;
+    return (
+      <AppLayout titulo="Projeto">
+        <p style={{ color: "#666" }}>Carregando…</p>
+      </AppLayout>
+    );
   }
 
   if (estado.fase === "erro") {
     return (
       <AppLayout titulo="Projeto">
-        <div style={{ border: "1px solid #E7C9A0", background: "#F6EEE1", borderRadius: 6, padding: 16 }}>
-          <strong>Não foi possível carregar este projeto.</strong>
-          <p style={{ margin: "6px 0 0", fontSize: 14, color: "#8A5A1E" }}>{estado.mensagem}</p>
-        </div>
+        <Aviso titulo="Não foi possível carregar este projeto." detalhe={estado.mensagem} />
       </AppLayout>
     );
   }
