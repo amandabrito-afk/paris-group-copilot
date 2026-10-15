@@ -1,0 +1,48 @@
+name: CI
+
+# Roda em todo PR aberto contra a main, e também em push direto nela
+# (que a branch protection impede, mas o gatilho fica como rede de segurança).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancela execuções antigas da mesma branch: o que vale é o último commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade:
+    name: Lint, tipos e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node 22 com cache de dependências
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          # O build não fala com a API: as chamadas acontecem no browser.
+          # A variável existe para o config não reclamar de ausência.
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+      # Depois do build, porque o Next gera em .next/types os tipos de rota
+      # que o App Router usa (LayoutProps e afins). Antes dele, tsc não os acha.
+      - name: Checagem de tipos
+        run: npx tsc --noEmit
