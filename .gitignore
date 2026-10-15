@@ -42,3 +42,5 @@ next-env.d.ts
 
 # template público de variáveis
 !.env.example
+!.env.local.example
+!.env.production.example
